@@ -28,12 +28,8 @@ void Messenger::sendMessage(char type, int value)
 	
 	Serial.print("S");
 	Serial.print(" ");
-	if(value == '@') Serial.write(value);
-	else Serial.print(value);
-	//Serial.println(type);
-	Serial.println(" ");
-	
-	
+	Serial.print(type);
+	Serial.println(value);
 	if ((_transmit_buffer_tail + 1) % MAX_TRANSMIT_BUFFER != _transmit_buffer_head) 
     {
 		// save new message in buffer: tail points to where byte goes
@@ -64,18 +60,18 @@ void Messenger::update()
 
 		Serial.print("T");
 		Serial.print(" ");
-		//Serial.write(data[0]);
+		Serial.write(data[0]);
 		Serial.print(data[1]);
-		//Serial.print(" ");
-		//Serial.print(checksum);
+		Serial.print(" ");
+		Serial.print(checksum);
 		
 		pinMode(_txPin,OUTPUT); // enable TX / output
-		_serial->write(data[1]);
+		_serial->write(data[0]);
 		//int message = 'E';
 		//_serial->write(message);
-		//_serial->write(data[1]);
-		//_serial->write(checksum);
-		//_serial->write('\n');
+		_serial->write(data[1]);
+		_serial->write(checksum);
+		_serial->write('\n');
 		pinMode(_txPin,INPUT); // disable TX / output
 		
 		if(data[0] == '@') // if confirmation remove
@@ -85,12 +81,12 @@ void Messenger::update()
 		else // else wait for confirmation
 		{
 			_waiting = true;
-			resendTime = millis()+random(1000,2000);//500,1000);
+			resendTime = millis()+random(500,1000);
 		}
 		
-		//Serial.print(" ");
-		//Serial.println(_waiting);
-		Serial.println(" ");
+		Serial.print(" ");
+		Serial.println(_waiting);
+		
 		digitalWrite(_ledPin, LOW);  
 	}
 	else
@@ -103,7 +99,7 @@ void Messenger::update()
 			while(_serial->available() > 0)
 				readMessage(_serial->read());
 		}
-		digitalWrite(_ledPin, HIGH);
+		digitalWrite(_ledPin, HIGH);  
 	}
 	
 	//_lightCounter--;
@@ -116,7 +112,7 @@ void Messenger::readMessage(int message)
 	//Serial.print(" ");
 	//Serial.println(message);
 	//Serial.print(" ");
-	/*if(message == '\n')
+	if(message == '\n')
 	{
 		//Serial.println("a");
 		_recMessageType		= -1;
@@ -141,41 +137,37 @@ void Messenger::readMessage(int message)
 		if ((_recMessageType+_recMessageValue)/2 == _recMessageChecksum)
 		{
 			//Serial.print("R");
-			//Serial.print(" ");*/
-	
-			_recMessageValue = message;
-	
-			//if(_recMessageType == '@')
-			if(_recMessageValue == '@')
+			//Serial.print(" ");
+			
+			if(_recMessageType == '@')
 			{
 				// value == checksum is head message?
 				
 				//(*_messageHandler)(_recMessageType, _recMessageValue);
 				
-				/*byte* data = _transmit_buffer[_transmit_buffer_head];
+				byte* data = _transmit_buffer[_transmit_buffer_head];
 				byte checksum = (data[0]+data[1])/2;
 				//Serial.print(checksum);
 				//Serial.print(" ");
 				//Serial.println(_recMessageValue);
 				if(_recMessageValue == checksum)
 				{
-					//Serial.println("c");*/
+					//Serial.println("c");
 					_transmit_buffer_head = (_transmit_buffer_head + 1) % MAX_TRANSMIT_BUFFER;
-				//	_waiting = false;
-				//}
+					_waiting = false;
+				}
 			}
 			else
 			{
 				(*_messageHandler)(_recMessageType, _recMessageValue, _id);
-				//sendMessage('@',_recMessageChecksum);
-				sendMessage('@','@');
+				sendMessage('@',_recMessageChecksum);
 			}
-		/*}
+		}
 		else 
 		{
 			//Serial.println("E");
 		}
-	}*/
+	}
 }
 void Messenger::listen()
 {
