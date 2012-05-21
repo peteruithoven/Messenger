@@ -81,7 +81,7 @@ void Messenger::update()
 		else // else wait for confirmation
 		{
 			_waiting = true;
-			resendTime = millis()+random(1000,2000);
+			resendTime = millis()+random(500,1000);
 		}
 		
 		Serial.print(" ");
