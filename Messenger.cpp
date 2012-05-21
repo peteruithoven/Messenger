@@ -2,9 +2,10 @@
 #include "Messenger.h"
 #include <SoftwareSerial.h>
 
-Messenger::Messenger(SoftwareSerial* serial, int txPin, MessageHandler messageHandler, int ledPin)
+Messenger::Messenger(int i,SoftwareSerial* serial, int txPin, MessageHandler messageHandler, int ledPin)
 {
 	//_serial;
+	_id = i;
 	_serial = serial;
 	_messageHandler = messageHandler;
 	_txPin = txPin;
@@ -158,8 +159,7 @@ void Messenger::readMessage(int message)
 			}
 			else
 			{
-				
-				(*_messageHandler)(_recMessageType, _recMessageValue);
+				(*_messageHandler)(_recMessageType, _recMessageValue, _id);
 				sendMessage('@',_recMessageChecksum);
 			}
 		}
@@ -168,4 +168,8 @@ void Messenger::readMessage(int message)
 			//Serial.println("E");
 		}
 	}
+}
+void Messenger::listen()
+{
+	_serial->listen();
 }

@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include <SoftwareSerial.h>
 
-typedef void (*MessageHandler)(int type, int value);
+typedef void (*MessageHandler)(int type, int value,int i);
 
 #define MAX_TRANSMIT_BUFFER 64
 #define MESSAGE_LENGTH 2
@@ -12,15 +12,17 @@ typedef void (*MessageHandler)(int type, int value);
 class Messenger
 {
   public:
-    Messenger(SoftwareSerial* serial, int txPin, MessageHandler messageHandler, int ledPin);
+    Messenger(int i,SoftwareSerial* serial, int txPin, MessageHandler messageHandler, int ledPin);
     void sendMessage(char type, int value);
     void update();
+	void listen();
 	
   private:
 	
 	SoftwareSerial* _serial;
     MessageHandler _messageHandler;
 	
+	int _id;
     int _txPin;
 	int _ledPin;
 	int _recMessageType;
@@ -32,6 +34,7 @@ class Messenger
 	byte _transmit_buffer_tail;
 	byte _transmit_buffer_head;
 	long resendTime;
+	
 	void readMessage(int message);
 };
 
