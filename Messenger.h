@@ -6,6 +6,9 @@
 
 typedef void (*MessageHandler)(int type, int value);
 
+#define MAX_TRANSMIT_BUFFER 64
+#define MESSAGE_LENGTH 2
+
 class Messenger
 {
   public:
@@ -14,17 +17,21 @@ class Messenger
     void update();
 	
   private:
+	
 	SoftwareSerial* _serial;
     MessageHandler _messageHandler;
+	
     int _txPin;
 	int _ledPin;
-	int _messageType;
-	int _messageValue;
 	int _recMessageType;
 	int _recMessageValue;
-	
+	int _recMessageChecksum;
 	int _lightCounter;
-	
+	boolean _waiting;
+	byte _transmit_buffer[MAX_TRANSMIT_BUFFER][MESSAGE_LENGTH]; 
+	byte _transmit_buffer_tail;
+	byte _transmit_buffer_head;
+	long resendTime;
 	void readMessage(int message);
 };
 
