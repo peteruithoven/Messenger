@@ -6,9 +6,10 @@
 
 typedef void (*MessageHandler)(int type, int value,int i);
 
-#define MAX_TRANSMIT_BUFFER 64
+#define MAX_TRANSMIT_BUFFER 24
+//64
 #define MESSAGE_LENGTH 2
-#define MESSENGER_DEBUG false
+#define MESSENGER_DEBUG true
 
 class Messenger
 {
@@ -32,9 +33,9 @@ class Messenger
 	int _lightCounter;
 	boolean _waiting;
 	byte _transmit_buffer[MAX_TRANSMIT_BUFFER][MESSAGE_LENGTH]; 
-	byte _transmit_buffer_tail;
-	byte _transmit_buffer_prev_tail;
-	byte _transmit_buffer_head;
+	int _transmit_buffer_tail;
+	int _transmit_buffer_head;
+	int _transmit_buffer_prev_head;
 	long resendTime;
 	long sendMessageTime;
 	

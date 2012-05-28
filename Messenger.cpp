@@ -21,7 +21,7 @@ Messenger::Messenger(int i,SoftwareSerial* serial, int txPin, MessageHandler mes
 	_lightCounter = 0;
 	_waiting = false;
 	
-	_transmit_buffer_tail = _transmit_buffer_head = _transmit_buffer_prev_tail = 0;
+	_transmit_buffer_head = _transmit_buffer_tail = _transmit_buffer_prev_head = 0;
 }
 void Messenger::sendMessage(char type, int value, bool overrideSameType) 
 {	
@@ -33,42 +33,70 @@ void Messenger::sendMessage(char type, int value, bool overrideSameType)
 		Serial.print(" ");
 		Serial.print(type);
 		Serial.print(value);
+		
+		int numMessages = 0;
+		if(_transmit_buffer_tail <_transmit_buffer_head)
+			numMessages = _transmit_buffer_head-_transmit_buffer_tail;
+		else if(_transmit_buffer_tail > _transmit_buffer_head)
+			numMessages = _transmit_buffer_head + (MAX_TRANSMIT_BUFFER-_transmit_buffer_tail);
 		Serial.print(" ");
-		Serial.print(overrideSameType);
+		Serial.print(_transmit_buffer_tail);
 		Serial.print(" ");
-		Serial.println(_transmit_buffer[_transmit_buffer_prev_tail][0]);
+		Serial.print(_transmit_buffer_head);
+		Serial.print(" ");
+		Serial.println(numMessages);
 	}
-	
-	if(overrideSameType && _transmit_buffer[_transmit_buffer_prev_tail][0] == type)
+	if(type=='@')
 	{
-		_transmit_buffer[_transmit_buffer_prev_tail][1] = value;
+		int temp_transmit_buffer_tail = _transmit_buffer_tail-1;
+		if(temp_transmit_buffer_tail < 0) temp_transmit_buffer_tail = MAX_TRANSMIT_BUFFER-1;
+		
+		if (temp_transmit_buffer_tail == _transmit_buffer_head)
+		{
+			// when the buffer is full I'm overriding messages because 
+			// the sooner the message from the other party are confirmed the sooner he is done sending.
+			temp_transmit_buffer_tail = _transmit_buffer_tail;
+			Serial.print("o");
+			Serial.println("t");
+		}
+		_transmit_buffer[temp_transmit_buffer_tail][0] = type; 
+		_transmit_buffer[temp_transmit_buffer_tail][1] = value;
+		_transmit_buffer_tail = temp_transmit_buffer_tail;
 	}
 	else
 	{
-		if ((_transmit_buffer_tail + 1) % MAX_TRANSMIT_BUFFER != _transmit_buffer_head) 
+		if(overrideSameType && _transmit_buffer[_transmit_buffer_prev_head][0] == type)
 		{
-			// save new message in buffer: tail points to where byte goes
-			_transmit_buffer[_transmit_buffer_tail][0] = type; 
-			_transmit_buffer[_transmit_buffer_tail][1] = value;
-			_transmit_buffer_prev_tail = _transmit_buffer_tail;
-			_transmit_buffer_tail = (_transmit_buffer_tail + 1) % MAX_TRANSMIT_BUFFER;
-		} 
-		else 
+			_transmit_buffer[_transmit_buffer_prev_head][1] = value;
+		}
+		else
 		{
-			// overflow
-			Serial.println("o");
+			if ((_transmit_buffer_head + 1) % MAX_TRANSMIT_BUFFER != _transmit_buffer_tail) 
+			{
+				// save new message in buffer: tail points to where byte goes
+				_transmit_buffer[_transmit_buffer_head][0] = type; 
+				_transmit_buffer[_transmit_buffer_head][1] = value;
+				_transmit_buffer_prev_head = _transmit_buffer_head;
+				_transmit_buffer_head = (_transmit_buffer_head + 1) % MAX_TRANSMIT_BUFFER;
+			} 
+			else 
+			{
+				// overflow
+				Serial.println("o");
+			}
 		}
 	}
 }
 void Messenger::update()
 {
+	//Serial.println("  u");
 	//if(_messageType != -1) // resend time, (recieved message is complete?)
 	
-	if (_transmit_buffer_head != _transmit_buffer_tail && (!_waiting || (_waiting && millis()>resendTime))) // buffer not empty?
+	if (_transmit_buffer_tail != _transmit_buffer_head && (!_waiting || (_waiting && millis()>resendTime))) // buffer not empty?
 	{
 		if(MESSENGER_DEBUG && _waiting && millis()>resendTime) Serial.println("r");
 		
-		byte* data = _transmit_buffer[_transmit_buffer_head]; // grab next byte
+		byte* data = _transmit_buffer[_transmit_buffer_tail]; // grab next byte
 		
 		//int sumData = (data[0]+data[1])/2;
 		//byte checksum = (sumData/256) ^ (sumData&0xFF);
@@ -85,28 +113,31 @@ void Messenger::update()
 			Serial.print(" ");
 			Serial.println(checksum);
 		}
-		
 		pinMode(_txPin,OUTPUT); // enable TX / output
+		_serial->write('\n');
 		_serial->write(data[0]);
 		//int message = 'E';
 		//_serial->write(message);
 		_serial->write(data[1]);
 		_serial->write(checksum);
-		_serial->write('\n');
 		pinMode(_txPin,INPUT); // disable TX / output
 		
-		//sendMessageTime = millis();
+		//if(!_waiting || (_waiting && millis()>resendTime))
+		//	sendMessageTime = millis();
 		
 		if(data[0] == '@') // if confirmation remove
 		{
-			_transmit_buffer_head = (_transmit_buffer_head + 1) % MAX_TRANSMIT_BUFFER;
+			_waiting = false;
+			_transmit_buffer_tail = (_transmit_buffer_tail + 1) % MAX_TRANSMIT_BUFFER;
 		}
-		else // else wait for confirmation
+		else // else wait for confirmation 		
 		{
 			_waiting = true;
 			// when the other atmega isn't listening we have to send it again
 			// with a direct connection it should take about 20 / 21 milliseconds
-			resendTime = millis()+random(40,80);
+			resendTime = millis()+random(40,80); //TODO try more, might fix similtanious transmit issue
+			//40,200: 10-62
+			//40,80: 10-51 (gem: 15)
 		}
 		digitalWrite(_ledPin, LOW);  
 		//_lightCounter = 200;
@@ -129,6 +160,7 @@ void Messenger::update()
 }
 void Messenger::readMessage(int message)
 {
+	//Serial.print(" ");
 	//Serial.print("R");
 	//Serial.print(" ");
 	//Serial.println(message);
@@ -157,9 +189,9 @@ void Messenger::readMessage(int message)
 			{
 				// value == checksum is head message?
 				
-				//(*_messageHandler)(_recMessageType, _recMessageValue, _id);
+				(*_messageHandler)(_recMessageType, _recMessageValue, _id);
 				
-				byte* data = _transmit_buffer[_transmit_buffer_head];
+				byte* data = _transmit_buffer[_transmit_buffer_tail];
 				byte checksum = (data[0]+data[1])/2;
 				
 				//Serial.print(checksum);
@@ -168,14 +200,14 @@ void Messenger::readMessage(int message)
 				
 				if(_recMessageValue == checksum)
 				{
-					//Serial.println("c");
-					_transmit_buffer[_transmit_buffer_head][0] = 0;
-					_transmit_buffer_head = (_transmit_buffer_head + 1) % MAX_TRANSMIT_BUFFER;
+					if(MESSENGER_DEBUG) Serial.println("c");
+					_transmit_buffer[_transmit_buffer_tail][0] = 0;
+					_transmit_buffer_tail = (_transmit_buffer_tail + 1) % MAX_TRANSMIT_BUFFER;
 					_waiting = false;
 					
 					//Serial.print('c');
 					//Serial.print(' ');
-					//Serial.println(millis()-sendMessageTime);	
+					//Serial.println(millis()-sendMessageTime);
 				}
 			}
 			else
